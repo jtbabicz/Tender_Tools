@@ -75,7 +75,7 @@ class Tender:
             else:
                 print("Error: Integration method not available")
 
-    def combine_data(self, mode = None, incident_energies = None):
+    def combine_data(self, mode = None, incident_energies = None, indices = None):
         """
         Average all RIXS or XES data into single spectrum
 
@@ -87,9 +87,20 @@ class Tender:
             List of incident X-ray energies as string. Necessary to aggregrate and combine data.
         """
         self.incident_energies = incident_energies
-        if mode == "RIXS" and incident_energies == None:
+        if mode == "RIXS" and incident_energies == None and indices == None:
             self.avg_data = np.mean(np.array(self.data), axis = 0)
             self.avg_data_norm = np.mean(np.array(self.data_norm), axis = 0)
+
+        if mode == "RIXS" and incident_energies == None and type(indices) is list:
+
+            temp_data = []
+            temp_data_norm = []
+            for x in indices:
+                temp_data.append(self.data[x])
+                temp_data_norm.append(self.data_norm[x])
+                   
+            self.avg_data = np.mean(np.array(temp_data), axis = 0)
+            self.avg_data_norm = np.mean(np.array(temp_data_norm), axis = 0)
 
         if mode == "XES" and type(incident_energies) is list:
             self.indices_by_energy = []
@@ -212,7 +223,7 @@ class Tender:
                 y = 0
                 for x in indices:
                     x_ecalib = conversion(self.list_avg_data_norm[x][:,0], m, b)
-                    self.list_avg_data_norm[x][:,0] = x_ecalib
+                    self.x_ecalib_kb= x_ecalib
                     
                     plt.subplot(2, 1, 1)
                     plt.plot(x_ecalib, self.list_avg_data_norm[x][:, 1], label = self.incident_energies[x])
@@ -292,4 +303,25 @@ class Tender:
                 plt.suptitle("Raw HERFD and TFY")
                 plt.tight_layout()
                 plt.show()
-                
+
+    def save_data(self, filename, mode):
+        if mode == "XES":
+            if hasattr(self, 'list_avg_data_norm'):
+                column_header = "Energy [eV]\tIntensity"
+                for x, y in zip(self.incident_energies, self.list_avg_data_norm):
+                    data = np.array([self.x_ecalib_kb, y[:,1]]).T
+                    name = filename[:-4] + "_" + x + filename[-4:]
+                    np.savetxt(name, data, header = column_header, delimiter = "\t")
+                    print("Writing XES data to: " + str(name))
+            else:
+                print("Attribute: list_avg_data_norm is missing")
+        elif mode == "RIXS":
+            if hasattr(self, 'avg_data_norm'):
+                column_header = "Energy [eV]\tHERFD\tTFY"
+                np.savetxt(filename, self.avg_data_norm, header = column_header, delimiter = "\t")
+                print("Writing RIXS Data to: " + str(filename))
+            else:
+                print("Attribute: list_avg_data_norm is missing")
+        elif mode != "RIXS" or mode != "XES":
+            print("Mode not recognized. Please specify XES or RIXS mode")
+
